@@ -68,10 +68,28 @@ public class GitService {
 
     public SyncStatus sync(String remoteUrl, String token) {
         if (notesDir == null) return new SyncStatus("error", "Notes directory not initialized");
+        if (remoteUrl == null || remoteUrl.isBlank()) {
+            return new SyncStatus("error", "Remote URL not configured");
+        }
         try (Git git = Git.open(notesDir.toFile())) {
+            // Configure remote origin
+            try {
+                var config = git.getRepository().getConfig();
+                String existingUrl = config.getString("remote", "origin", "url");
+                if (existingUrl == null || !existingUrl.equals(remoteUrl)) {
+                    config.setString("remote", "origin", "url", remoteUrl);
+                    config.setString("remote", "origin", "fetch", "+refs/heads/*:refs/remotes/origin/*");
+                    config.save();
+                    log.info("Configured remote origin URL: {}", remoteUrl);
+                }
+            } catch (Exception e) {
+                return new SyncStatus("error", "Failed to configure remote: " + e.getMessage());
+            }
+            
             UsernamePasswordCredentialsProvider creds = null;
             if (token != null && !token.isBlank()) {
-                creds = new UsernamePasswordCredentialsProvider(token, "");
+                // For GitHub PAT, use it as the password with a placeholder username
+                creds = new UsernamePasswordCredentialsProvider("x-access-token", token);
             }
             // pull
             var pullCmd = git.pull();
