@@ -116,6 +116,18 @@ body {
 .btn-delete { color: #e53935; }
 .btn-delete:hover { background: #ffebee; border-color: #e53935; }
 
+.btn-wiki-nav {
+    padding: 4px 10px;
+    border: 1px solid #1a73e8;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    background: #e8f0fe;
+    color: #1a73e8;
+}
+
+.btn-wiki-nav:hover { background: #d2e3fc; }
+
 .CodeMirror, .CodeMirror-scroll {
     height: 100% !important;
 }
@@ -136,6 +148,16 @@ body {
     padding: 20px;
 }
 
+/* Reduce heading sizes in preview and editor */
+.editor-preview h1 { font-size: 1.6em; }
+.editor-preview h2 { font-size: 1.35em; }
+.editor-preview h3 { font-size: 1.15em; }
+.editor-preview h4 { font-size: 1.05em; }
+.cm-s-easymde .cm-header-1 { font-size: 1.5em !important; }
+.cm-s-easymde .cm-header-2 { font-size: 1.3em !important; }
+.cm-s-easymde .cm-header-3 { font-size: 1.15em !important; }
+.cm-s-easymde .cm-header-4 { font-size: 1.05em !important; }
+
 .wiki-link {
     color: #1a73e8;
     text-decoration: none;
@@ -143,6 +165,18 @@ body {
 }
 
 .wiki-link:hover { background: #e8f0fe; }
+
+.wiki-link-arrow { font-size: 0.8em; }
+
+/* Wiki-link highlight in the editor */
+.cm-wiki-link {
+    color: #1a73e8;
+    text-decoration: underline;
+    cursor: text;
+}
+
+/* H4 heading button icon */
+.editor-toolbar button.heading-4::after { content: "4"; }
 
 /* Settings page */
 .settings-page {

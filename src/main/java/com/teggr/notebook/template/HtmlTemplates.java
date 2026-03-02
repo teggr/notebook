@@ -46,6 +46,8 @@ public class HtmlTemplates {
                         div().withClass("editor-panel").with(
                             div().withClass("editor-toolbar-custom").with(
                                 span().withClass("save-status").withId("save-status"),
+                                button("↗ Open note").withClass("btn-wiki-nav").withId("btn-wiki-nav")
+                                    .withStyle("display:none"),
                                 button("Sync").withClass("btn-sync").withId("btn-sync"),
                                 button("Delete").withClass("btn-delete").withId("btn-delete")
                             ),
