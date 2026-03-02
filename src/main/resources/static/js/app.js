@@ -3,6 +3,37 @@ let currentNoteId = document.getElementById('current-note-id')?.value || '';
 let saveTimeout;
 let isSaving = false;
 
+// Replicates NoteService.toId logic to compute note ID from title
+function titleToId(title) {
+    const sanitized = title.trim().replace(/[^a-zA-Z0-9 _-]/g, '').trim().replace(/\s+/g, '-');
+    return encodeURIComponent(sanitized || 'untitled');
+}
+
+function renderWikiLinks(html) {
+    return html.replace(/\[\[([^\]]+)\]\]/g, function(match, title) {
+        const id = titleToId(title);
+        return `<a href="/note/${id}" class="wiki-link">${title} <span class="wiki-link-arrow" aria-hidden="true">↗</span></a>`;
+    });
+}
+
+function updateWikiNavButton(cm) {
+    const btn = document.getElementById('btn-wiki-nav');
+    if (!btn) return;
+    const pos = cm.getCursor();
+    const line = cm.getLine(pos.line);
+    if (!line) { btn.style.display = 'none'; return; }
+    const wikiLinkRegex = /\[\[([^\]]+)\]\]/g;
+    let match;
+    while ((match = wikiLinkRegex.exec(line)) !== null) {
+        if (pos.ch >= match.index && pos.ch <= match.index + match[0].length) {
+            btn.dataset.title = match[1];
+            btn.style.display = '';
+            return;
+        }
+    }
+    btn.style.display = 'none';
+}
+
 function initEditor() {
     const textarea = document.getElementById('editor');
     if (!textarea) return;
@@ -11,17 +42,28 @@ function initEditor() {
         element: textarea,
         autosave: { enabled: false },
         spellChecker: false,
+        sideBySideFullscreen: false,
         previewRender: function(text) {
-            // marked is bundled with EasyMDE and available globally
-            let html = marked.parse(text);
-            html = html.replace(/\[\[([^\]]+)\]\]/g, function(match, title) {
-                const encoded = encodeURIComponent(title);
-                return `<a href="/note/${encoded}" class="wiki-link">${title}</a>`;
-            });
-            return html;
+            let html = easyMDE.markdown(text);
+            return renderWikiLinks(html);
         },
         toolbar: [
-            'bold', 'italic', 'heading', '|',
+            'bold', 'italic', '|',
+            'heading-1', 'heading-2', 'heading-3',
+            {
+                name: 'heading-4',
+                action: function(editor) {
+                    const cm = editor.codemirror;
+                    const cursor = cm.getCursor();
+                    const line = cm.getLine(cursor.line);
+                    const stripped = line.replace(/^#{1,6} /, '');
+                    const newLine = line.startsWith('#### ') ? stripped : '#### ' + stripped;
+                    cm.replaceRange(newLine, {line: cursor.line, ch: 0}, {line: cursor.line, ch: line.length});
+                },
+                className: 'fa fa-heading heading-4',
+                title: 'Heading 4'
+            },
+            '|',
             'quote', 'unordered-list', 'ordered-list', '|',
             'link', 'image', '|',
             'preview', 'side-by-side', 'fullscreen', '|',
@@ -37,6 +79,23 @@ function initEditor() {
 
     easyMDE.codemirror.on('change', function() {
         scheduleSave();
+    });
+
+    // Wiki-link overlay: highlight [[title]] in the editor
+    const wikiLinkOverlay = {
+        token: function(stream) {
+            if (stream.match(/\[\[[^\]]+\]\]/)) {
+                return 'wiki-link';
+            }
+            while (stream.next() !== null && !stream.match(/\[\[/, false)) {}
+            return null;
+        }
+    };
+    easyMDE.codemirror.addOverlay(wikiLinkOverlay);
+
+    // Show wiki nav button when cursor is inside [[title]]
+    easyMDE.codemirror.on('cursorActivity', function(cm) {
+        updateWikiNavButton(cm);
     });
 
     // Image paste support
@@ -197,4 +256,8 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btn-new')?.addEventListener('click', createNote);
     document.getElementById('btn-delete')?.addEventListener('click', deleteCurrentNote);
     document.getElementById('btn-sync')?.addEventListener('click', syncNotes);
+    document.getElementById('btn-wiki-nav')?.addEventListener('click', function() {
+        const title = this.dataset.title;
+        if (title) window.location.href = '/note/' + titleToId(title);
+    });
 });
