@@ -154,6 +154,21 @@ function deleteCurrentNote() {
         .catch(err => console.error('Failed to delete note:', err));
 }
 
+function showToast(message, isError) {
+    let toast = document.getElementById('toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.className = 'toast' + (isError ? ' toast-error' : ' toast-ok');
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    clearTimeout(toast._hideTimer);
+    toast._hideTimer = setTimeout(() => { toast.className = 'toast'; }, 4000);
+}
+
 function syncNotes() {
     const btn = document.getElementById('btn-sync');
     btn.textContent = 'Syncing...';
@@ -161,9 +176,9 @@ function syncNotes() {
     fetch('/api/git/sync', { method: 'POST' })
         .then(r => r.json())
         .then(result => {
-            alert(result.message || result.status);
+            showToast(result.message || result.status, result.status === 'error');
         })
-        .catch(err => alert('Sync failed: ' + err))
+        .catch(err => showToast('Sync failed: ' + err, true))
         .finally(() => {
             btn.textContent = 'Sync';
             btn.disabled = false;

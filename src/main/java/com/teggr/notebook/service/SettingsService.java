@@ -1,5 +1,7 @@
 package com.teggr.notebook.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
@@ -9,13 +11,15 @@ import java.util.Properties;
 @Service
 public class SettingsService {
 
+    private static final Logger log = LoggerFactory.getLogger(SettingsService.class);
+
     private final Path configFile = Path.of(System.getProperty("user.home"), ".notebook", "config.properties");
 
     public SettingsService() {
         try {
             Files.createDirectories(configFile.getParent());
         } catch (IOException e) {
-            // ignore
+            log.warn("Could not create config directory {}: {}", configFile.getParent(), e.getMessage());
         }
     }
 
@@ -25,7 +29,7 @@ public class SettingsService {
             try (InputStream in = Files.newInputStream(configFile)) {
                 props.load(in);
             } catch (IOException e) {
-                // ignore
+                log.warn("Could not load settings from {}: {}", configFile, e.getMessage());
             }
         }
         return props;

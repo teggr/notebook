@@ -8,10 +8,13 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
 public class ImageController {
+
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of("png", "jpg", "jpeg", "gif", "webp");
 
     private final NoteService noteService;
 
@@ -24,7 +27,12 @@ public class ImageController {
         String ext = "png";
         String originalFilename = file.getOriginalFilename();
         if (originalFilename != null && originalFilename.contains(".")) {
-            ext = originalFilename.substring(originalFilename.lastIndexOf('.') + 1);
+            String candidate = originalFilename.substring(originalFilename.lastIndexOf('.') + 1).toLowerCase();
+            if (ALLOWED_EXTENSIONS.contains(candidate)) {
+                ext = candidate;
+            } else {
+                return ResponseEntity.badRequest().body(Map.of("error", "Unsupported image format: " + candidate));
+            }
         }
         String filename = UUID.randomUUID() + "." + ext;
         Path imageDir = noteService.getNotesDir().resolve("images");

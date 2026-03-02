@@ -61,10 +61,14 @@ class NoteServiceTest {
     }
 
     @Test
-    void listNotesReturnsSortedByDate() throws IOException, InterruptedException {
-        noteService.createNote("First Note", "# First Note");
-        Thread.sleep(50);
-        noteService.createNote("Second Note", "# Second Note");
+    void listNotesReturnsSortedByDate() throws IOException {
+        Note first = noteService.createNote("First Note", "# First Note");
+        Note second = noteService.createNote("Second Note", "# Second Note");
+        // Set timestamps explicitly so ordering is deterministic
+        java.nio.file.attribute.FileTime earlier = java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() - 10000);
+        java.nio.file.attribute.FileTime later = java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis());
+        java.nio.file.Files.setLastModifiedTime(tempDir.resolve(java.net.URLDecoder.decode(first.getId(), java.nio.charset.StandardCharsets.UTF_8) + ".md"), earlier);
+        java.nio.file.Files.setLastModifiedTime(tempDir.resolve(java.net.URLDecoder.decode(second.getId(), java.nio.charset.StandardCharsets.UTF_8) + ".md"), later);
 
         List<NoteListItem> notes = noteService.listNotes();
         assertEquals(2, notes.size());

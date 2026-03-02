@@ -4,6 +4,8 @@ import com.teggr.notebook.model.SyncStatus;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -14,6 +16,8 @@ import java.util.concurrent.Executors;
 
 @Service
 public class GitService {
+
+    private static final Logger log = LoggerFactory.getLogger(GitService.class);
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private Path notesDir;
@@ -32,9 +36,9 @@ public class GitService {
         File gitDir = notesDir.resolve(".git").toFile();
         if (!gitDir.exists()) {
             try (Git git = Git.init().setDirectory(notesDir.toFile()).call()) {
-                // initialized
+                log.info("Initialized git repository at {}", notesDir);
             } catch (GitAPIException e) {
-                // ignore
+                log.warn("Failed to initialize git repository at {}: {}", notesDir, e.getMessage());
             }
         }
     }
@@ -44,7 +48,7 @@ public class GitService {
             try {
                 doCommit(message, dir);
             } catch (Exception e) {
-                // log but don't fail
+                log.warn("Failed to commit '{}': {}", message, e.getMessage());
             }
         });
     }
@@ -75,7 +79,7 @@ public class GitService {
             try {
                 pullCmd.call();
             } catch (Exception e) {
-                // no remote or other issue - continue
+                log.warn("Pull failed (may have no remote): {}", e.getMessage());
             }
             // push
             var pushCmd = git.push();

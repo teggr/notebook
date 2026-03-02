@@ -20,7 +20,7 @@ public class HtmlTemplates {
                     meta().withCharset("UTF-8"),
                     meta().withName("viewport").withContent("width=device-width, initial-scale=1.0"),
                     title("Notebook"),
-                    link().withRel("stylesheet").withHref("https://unpkg.com/easymde/dist/easymde.min.css"),
+                    link().withRel("stylesheet").withHref("/vendor/easymde.min.css"),
                     link().withRel("stylesheet").withHref("/css/app.css")
                 ),
                 body(
@@ -54,7 +54,7 @@ public class HtmlTemplates {
                     ),
                     // Hidden field for current note id
                     input().withType("hidden").withId("current-note-id").withValue(selectedId),
-                    script().withSrc("https://unpkg.com/easymde/dist/easymde.min.js"),
+                    script().withSrc("/vendor/easymde.min.js"),
                     script().withSrc("/js/app.js")
                 )
             )

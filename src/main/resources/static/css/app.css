@@ -198,3 +198,31 @@ body {
     color: #1a73e8;
     text-decoration: none;
 }
+
+.toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.toast.toast-ok, .toast.toast-error {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.toast.toast-ok {
+    background: #2e7d32;
+    color: #fff;
+}
+
+.toast.toast-error {
+    background: #c62828;
+    color: #fff;
+}
