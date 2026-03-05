@@ -3,6 +3,8 @@ package com.teggr.notebook.service;
 import com.teggr.notebook.model.SyncStatus;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +37,7 @@ public class GitService {
         this.notesDir = notesDir;
         File gitDir = notesDir.resolve(".git").toFile();
         if (!gitDir.exists()) {
-            try (Git git = Git.init().setDirectory(notesDir.toFile()).call()) {
+            try (Git git = Git.init().setDirectory(notesDir.toFile()).setInitialBranch("main").call()) {
                 log.info("Initialized git repository at {}", notesDir);
             } catch (GitAPIException e) {
                 log.warn("Failed to initialize git repository at {}: {}", notesDir, e.getMessage());
@@ -91,16 +93,35 @@ public class GitService {
                 // For GitHub PAT, use it as the password with a placeholder username
                 creds = new UsernamePasswordCredentialsProvider("x-access-token", token);
             }
-            // pull
-            var pullCmd = git.pull();
-            if (creds != null) pullCmd.setCredentialsProvider(creds);
-            try {
-                pullCmd.call();
-            } catch (Exception e) {
-                log.warn("Pull failed (may have no remote): {}", e.getMessage());
+
+            alignBranchWithRemoteIfNeeded(git, creds);
+
+            String currentBranch = git.getRepository().getBranch();
+            boolean remoteHasHeads = hasAnyRemoteHead(git, creds);
+
+            if (remoteHasHeads) {
+                var pullCmd = git.pull()
+                        .setRemote("origin")
+                        .setRemoteBranchName(currentBranch);
+                if (creds != null) pullCmd.setCredentialsProvider(creds);
+                try {
+                    pullCmd.call();
+                } catch (Exception e) {
+                    log.warn("Pull failed: {}", e.getMessage());
+                }
+            } else {
+                log.info("Skipping pull because remote origin has no branches yet");
             }
+
+            ObjectId head = git.getRepository().resolve("HEAD");
+            if (head == null) {
+                return new SyncStatus("error", "No local commits to push yet. Create or edit a note, then sync again.");
+            }
+
             // push
-            var pushCmd = git.push();
+            var pushCmd = git.push()
+                    .setRemote("origin")
+                    .setRefSpecs(new RefSpec("refs/heads/" + currentBranch + ":refs/heads/" + currentBranch));
             if (creds != null) pushCmd.setCredentialsProvider(creds);
             try {
                 pushCmd.call();
@@ -110,6 +131,52 @@ public class GitService {
             }
         } catch (IOException e) {
             return new SyncStatus("error", "Git error: " + e.getMessage());
+        }
+    }
+
+    private boolean hasAnyRemoteHead(Git git, UsernamePasswordCredentialsProvider creds) {
+        try {
+            var lsRemote = git.lsRemote()
+                    .setRemote("origin")
+                    .setHeads(true);
+            if (creds != null) lsRemote.setCredentialsProvider(creds);
+            return !lsRemote.call().isEmpty();
+        } catch (Exception e) {
+            log.warn("Could not inspect remote heads: {}", e.getMessage());
+            return true;
+        }
+    }
+
+    private void alignBranchWithRemoteIfNeeded(Git git, UsernamePasswordCredentialsProvider creds) {
+        try {
+            var fetch = git.fetch()
+                    .setRemote("origin")
+                    .setRefSpecs(new RefSpec("+refs/heads/*:refs/remotes/origin/*"));
+            if (creds != null) fetch.setCredentialsProvider(creds);
+            fetch.call();
+
+            String currentBranch = git.getRepository().getBranch();
+            var remoteMain = git.getRepository().findRef("refs/remotes/origin/main");
+            var remoteMaster = git.getRepository().findRef("refs/remotes/origin/master");
+
+            if ("master".equals(currentBranch) && remoteMain != null && remoteMaster == null) {
+                var localMain = git.getRepository().findRef("refs/heads/main");
+                if (localMain == null) {
+                    git.branchRename().setOldName("master").setNewName("main").call();
+                } else {
+                    git.checkout().setName("main").call();
+                }
+
+                var config = git.getRepository().getConfig();
+                config.setString("branch", "main", "remote", "origin");
+                config.setString("branch", "main", "merge", "refs/heads/main");
+                config.unsetSection("branch", "master");
+                config.save();
+
+                log.info("Aligned local branch from master to main to match remote");
+            }
+        } catch (Exception e) {
+            log.warn("Could not align local branch with remote: {}", e.getMessage());
         }
     }
 }
