@@ -7,6 +7,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.lang.reflect.Field;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -77,5 +81,21 @@ class GitServiceTest {
         try (Git remoteGit = Git.open(remoteDir.toFile())) {
             assertNotNull(remoteGit.getRepository().findRef("refs/heads/main"));
         }
+    }
+
+    @Test
+    void waitForPendingCommitsReturnsAfterTimeoutForStuckFuture() throws Exception {
+        Field pendingField = GitService.class.getDeclaredField("pendingCommits");
+        pendingField.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        List<Future<?>> pending = (List<Future<?>>) pendingField.get(gitService);
+        pending.add(new CompletableFuture<>());
+
+        long startNanos = System.nanoTime();
+        gitService.waitForPendingCommits(25);
+        long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+
+        assertTrue(elapsedMs < 500, "waitForPendingCommits should return near configured timeout");
     }
 }

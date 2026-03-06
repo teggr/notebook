@@ -17,8 +17,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -54,14 +56,16 @@ public class GitService {
     }
 
     public void commitAsync(String message, Path dir) {
-        Future<?> future = executor.submit(() -> {
-            try {
-                doCommit(message, dir);
-            } catch (Exception e) {
-                log.warn("Failed to commit '{}': {}", message, e.getMessage());
-            }
-        });
-        pendingCommits.add(future);
+        synchronized (pendingCommits) {
+            Future<?> future = executor.submit(() -> {
+                try {
+                    doCommit(message, dir);
+                } catch (Exception e) {
+                    log.warn("Failed to commit '{}': {}", message, e.getMessage());
+                }
+            });
+            pendingCommits.add(future);
+        }
     }
 
     private void doCommit(String message, Path dir) throws IOException, GitAPIException {
@@ -147,31 +151,48 @@ public class GitService {
         }
     }
 
+    // Package-private for testing.
     void waitForPendingCommits(long timeoutMillis) {
         if (timeoutMillis <= 0) {
             return;
         }
 
         final long deadline = System.currentTimeMillis() + timeoutMillis;
-        final List<Future<?>> snapshot;
 
-        synchronized (pendingCommits) {
-            snapshot = new ArrayList<>(pendingCommits);
-            pendingCommits.clear();
-        }
-
-        for (Future<?> future : snapshot) {
-            long remainingMs = deadline - System.currentTimeMillis();
+        while (true) {
+            long now = System.currentTimeMillis();
+            long remainingMs = deadline - now;
             if (remainingMs <= 0) {
                 break;
             }
-            try {
-                future.get(remainingMs, TimeUnit.MILLISECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("Pending commit wait was interrupted before sync: {}", e.getMessage());
-            } catch (Exception e) {
-                log.warn("Pending commit did not complete before sync: {}", e.getMessage());
+
+            final List<Future<?>> snapshot;
+            synchronized (pendingCommits) {
+                if (pendingCommits.isEmpty()) {
+                    // No more commits currently pending; we're done.
+                    break;
+                }
+                snapshot = new ArrayList<>(pendingCommits);
+                pendingCommits.clear();
+            }
+
+            for (Future<?> future : snapshot) {
+                remainingMs = deadline - System.currentTimeMillis();
+                if (remainingMs <= 0) {
+                    // Timeout reached; stop waiting.
+                    break;
+                }
+                try {
+                    future.get(remainingMs, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.warn("Pending commit wait was interrupted before sync: {}", e.getMessage());
+                    return;
+                } catch (TimeoutException e) {
+                    log.warn("Pending commit timed out before sync: {}", e.getMessage());
+                } catch (ExecutionException e) {
+                    log.warn("Pending commit did not complete before sync: {}", e.getMessage());
+                }
             }
         }
     }
