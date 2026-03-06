@@ -38,7 +38,10 @@ public class NoteApiController {
     @PostMapping
     public ResponseEntity<Note> createNote(@RequestBody Map<String, String> body) throws IOException {
         String title = body.getOrDefault("title", "Untitled");
-        String content = body.getOrDefault("content", "# " + title + "\n\n");
+        String content = body.get("content");
+        if (content == null || content.isBlank()) {
+            content = "# Unittled\n\n";
+        }
         Note note = noteService.createNote(title, content);
         return ResponseEntity.status(HttpStatus.CREATED).body(note);
     }

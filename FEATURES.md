@@ -21,10 +21,9 @@ A git-native, markdown-based note-taking application built with Spring Boot.
 - Automatically inserts `![](images/filename.png)` at cursor
 - Endpoint: `POST /api/images`
 
-### Wiki Links
-- Syntax: `[[Note Title]]`
-- Rendered as clickable links in preview mode
-- Navigate to linked notes
+### Note Linking
+- Note-to-note linking is currently deferred and not active in this release
+- Follow-up work will define link syntax and navigation behavior
 
 ### Git Integration
 - Notes directory auto-initialized as git repo

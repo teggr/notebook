@@ -29,11 +29,13 @@ GET /api/notes
 
 Returns a list of all notes sorted by last-modified date (newest first).
 
+Note IDs are opaque unique identifiers and are not derived from note titles.
+
 **Response** `200 OK`
 ```json
 [
   {
-    "id": "My-Note",
+    "id": "b7ef3194-8f74-4f7b-8f14-3295a8a85f7a",
     "title": "My Note",
     "lastModifiedFormatted": "Mar 4, 2026"
   }
@@ -51,7 +53,7 @@ GET /api/notes/{id}
 **Response** `200 OK`
 ```json
 {
-  "id": "My-Note",
+  "id": "b7ef3194-8f74-4f7b-8f14-3295a8a85f7a",
   "title": "My Note",
   "content": "# My Note\n\nNote content here.",
   "lastModified": "2026-03-04T15:00:00Z"
@@ -77,12 +79,12 @@ Content-Type: application/json
 }
 ```
 
-Both fields are optional. `title` defaults to `"Untitled"`. `content` defaults to `"# {title}\n\n"`.
+Both fields are optional. `title` defaults to `"Untitled"`. `content` defaults to `"# Unittled\n\n"` when omitted or blank.
 
 **Response** `201 Created`
 ```json
 {
-  "id": "My-Note",
+  "id": "b7ef3194-8f74-4f7b-8f14-3295a8a85f7a",
   "title": "My Note",
   "content": "# My Note\n\nNote content here.",
   "lastModified": "2026-03-04T15:00:00Z"
@@ -108,7 +110,7 @@ Content-Type: application/json
 **Response** `200 OK`
 ```json
 {
-  "id": "My-Note",
+  "id": "b7ef3194-8f74-4f7b-8f14-3295a8a85f7a",
   "title": "My Note",
   "content": "# My Note\n\nUpdated content.",
   "lastModified": "2026-03-04T15:01:00Z"

@@ -12,6 +12,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Files;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 
@@ -88,5 +91,32 @@ class NoteServiceTest {
         noteService.updateNote(created.getId(), "# Update Me\n\nUpdated content");
         Note updated = noteService.getNote(created.getId()).orElseThrow();
         assertTrue(updated.getContent().contains("Updated content"));
+    }
+
+    @Test
+    void createDuplicateTitlesCreatesDistinctFilesWithoutOverwrite() throws IOException {
+        Note first = noteService.createNote("New Note", "# Unittled\n\nFirst content");
+        Note second = noteService.createNote("New Note", "# Unittled\n\nSecond content");
+
+        assertNotEquals(first.getId(), second.getId());
+
+        Path firstFile = tempDir.resolve(URLDecoder.decode(first.getId(), StandardCharsets.UTF_8) + ".md");
+        Path secondFile = tempDir.resolve(URLDecoder.decode(second.getId(), StandardCharsets.UTF_8) + ".md");
+
+        assertTrue(Files.exists(firstFile));
+        assertTrue(Files.exists(secondFile));
+        assertNotEquals(firstFile, secondFile);
+
+        String firstContent = Files.readString(firstFile);
+        String secondContent = Files.readString(secondFile);
+        assertEquals("# Unittled\n\nFirst content", firstContent);
+        assertEquals("# Unittled\n\nSecond content", secondContent);
+
+        Optional<Note> firstFetched = noteService.getNote(first.getId());
+        Optional<Note> secondFetched = noteService.getNote(second.getId());
+        assertTrue(firstFetched.isPresent());
+        assertTrue(secondFetched.isPresent());
+        assertEquals("# Unittled\n\nFirst content", firstFetched.get().getContent());
+        assertEquals("# Unittled\n\nSecond content", secondFetched.get().getContent());
     }
 }

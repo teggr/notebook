@@ -11,7 +11,6 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -78,7 +77,7 @@ public class NoteService {
     }
 
     public Note createNote(String title, String content) throws IOException {
-        String id = toId(title);
+        String id = URLEncoder.encode(UUID.randomUUID().toString(), StandardCharsets.UTF_8);
         Path file = notesDir.resolve(decodeId(id) + ".md");
         Files.writeString(file, content);
         Instant lastMod = Files.getLastModifiedTime(file).toInstant();
