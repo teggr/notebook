@@ -13,21 +13,29 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.File;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class GitService {
 
     private static final Logger log = LoggerFactory.getLogger(GitService.class);
+    private static final long SYNC_COMMIT_WAIT_TIMEOUT_MS = 5000;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final List<Future<?>> pendingCommits = Collections.synchronizedList(new ArrayList<>());
     private Path notesDir;
 
     public void shutdown() {
+        waitForPendingCommits(SYNC_COMMIT_WAIT_TIMEOUT_MS);
         executor.shutdown();
         try {
-            executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS);
+            executor.awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -46,13 +54,14 @@ public class GitService {
     }
 
     public void commitAsync(String message, Path dir) {
-        executor.submit(() -> {
+        Future<?> future = executor.submit(() -> {
             try {
                 doCommit(message, dir);
             } catch (Exception e) {
                 log.warn("Failed to commit '{}': {}", message, e.getMessage());
             }
         });
+        pendingCommits.add(future);
     }
 
     private void doCommit(String message, Path dir) throws IOException, GitAPIException {
@@ -73,6 +82,10 @@ public class GitService {
         if (remoteUrl == null || remoteUrl.isBlank()) {
             return new SyncStatus("error", "Remote URL not configured");
         }
+
+        // Avoid racing sync against queued async commits from note updates.
+        waitForPendingCommits(SYNC_COMMIT_WAIT_TIMEOUT_MS);
+
         try (Git git = Git.open(notesDir.toFile())) {
             // Configure remote origin
             try {
@@ -131,6 +144,35 @@ public class GitService {
             }
         } catch (IOException e) {
             return new SyncStatus("error", "Git error: " + e.getMessage());
+        }
+    }
+
+    void waitForPendingCommits(long timeoutMillis) {
+        if (timeoutMillis <= 0) {
+            return;
+        }
+
+        final long deadline = System.currentTimeMillis() + timeoutMillis;
+        final List<Future<?>> snapshot;
+
+        synchronized (pendingCommits) {
+            snapshot = new ArrayList<>(pendingCommits);
+            pendingCommits.clear();
+        }
+
+        for (Future<?> future : snapshot) {
+            long remainingMs = deadline - System.currentTimeMillis();
+            if (remainingMs <= 0) {
+                break;
+            }
+            try {
+                future.get(remainingMs, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Pending commit wait was interrupted before sync: {}", e.getMessage());
+            } catch (Exception e) {
+                log.warn("Pending commit did not complete before sync: {}", e.getMessage());
+            }
         }
     }
 
